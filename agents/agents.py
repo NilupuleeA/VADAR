@@ -36,7 +36,7 @@ from prompts.api_prompt import API_PROMPT, API_PROMPT_GQA, API_PROMPT_CLEVR
 class Agent:
     def __init__(
         self,
-        model_name="gpt-4o",
+        model_name="gemini-2.5-flash",
         write_results=True,
         api_key_path="./api.key",
         dataset="clevr",
@@ -49,7 +49,7 @@ class Agent:
 class SignatureAgent(Agent):
 
     def __init__(
-        self, predef_signatures, model_name="gpt-4o", write_results=True, headers=[]
+        self, predef_signatures, model_name="gemini-2.5-flash", write_results=True, headers=[]
     ):
         super().__init__(model_name, write_results)
         self.signatures = predef_signatures
@@ -210,7 +210,7 @@ class SignatureAgent(Agent):
 class APIAgent(Agent):
 
     def __init__(
-        self, signature_agent, dataset, model_name="gpt-4o", write_results=True, api=[]
+        self, signature_agent, dataset, model_name="gemini-2.5-flash", write_results=True, api=[]
     ):
         super().__init__(model_name, write_results)
         self.signature_agent = signature_agent
@@ -726,7 +726,7 @@ with open("{result_file}", "w+") as result_file:
 
 class ProgramAgent(Agent):
     def __init__(
-        self, api_agent, model_name="gpt-4o", write_results=True, dataset="clevr"
+        self, api_agent, model_name="gemini-2.5-flash", write_results=True, dataset="clevr"
     ):
         super().__init__(model_name, write_results, dataset=dataset)
         self.api_agent = api_agent

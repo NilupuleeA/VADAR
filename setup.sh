@@ -11,7 +11,7 @@ git clone https://github.com/lpiccinelli-eth/UniDepth.git && cd UniDepth
 pip install -e .
 cd ..
 
-pip install torch==2.2.0 torchvision==0.17.0 xformers==0.0.24 --index-url https://download.pytorch.org/whl/cu122 --force-reinstall
+pip install torch==2.5.1+cu121 torchvision==0.20.1+cu121 torchaudio==2.5.1+cu121 xformers==0.0.28.post3 --index-url https://download.pytorch.org/whl/cu121
 
 git clone https://github.com/IDEA-Research/GroundingDINO.git && cd GroundingDINO/
 pip install -e .

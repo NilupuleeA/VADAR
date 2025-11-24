@@ -1,5 +1,5 @@
 import numpy as np
-from openai import OpenAI
+# from openai import OpenAI
 import json
 from PIL import Image, ImageDraw
 from io import BytesIO
@@ -7,6 +7,12 @@ import base64
 import time
 import torch
 
+import os
+import time
+# --- NEW IMPORTS ---
+from google import genai
+from google.genai.errors import APIError
+# -------------------
 
 def correct_indentation(code_str):
     lines = code_str.split("\n")
@@ -48,16 +54,82 @@ def get_methods_from_json(api_json):
     return methods, namespace
 
 
+# class Generator:
+#     def __init__(self, model_name="gpt-4o", temperature=0.7, api_key_path="./api.key"):
+#         self.temperature = temperature
+#         self.model_name = model_name
+#         self.api_key_path = api_key_path
+#         with open(self.api_key_path, "r") as file:
+#             self.client = OpenAI(api_key=file.read().strip())
+
+#     def remove_substring(self, output, substring):
+
+#         if substring in output:
+#             return output.replace(substring, "")
+#         else:
+#             return output
+
+#     def generate(self, prompt, messages=None):
+#         new_messages = None
+#         if self.model_name == "gpt-3.5-turbo-instruct":
+#             response = self.client.Completion.create(
+#                 model=self.model_name,
+#                 prompt=prompt,
+#                 temperature=self.temperature,
+#                 max_tokens=1024,
+#                 top_p=0.5,
+#                 frequency_penalty=0,
+#                 presence_penalty=0,
+#                 n=1,
+#                 logprobs=11,
+#             )
+
+#             result = response.choices[0]["text"].lstrip("\n").rstrip("\n")
+#             result = self.remove_substring(result, "```python")
+#             result = self.remove_substring(result, "```")
+
+#         else:
+#             if not messages:
+#                 messages = [{"role": "user", "content": prompt}]
+#             try:
+#                 response = self.client.chat.completions.create(
+#                     model=self.model_name,
+#                     messages=messages,
+#                     temperature=self.temperature,
+#                 )
+#             except Exception as e:
+#                 time.sleep(60)
+#                 return self.generate(prompt, messages)
+#             new_messages = messages
+#             result = response.choices[0].message.content.lstrip("\n").rstrip("\n")
+#             result = self.remove_substring(result, "```python")
+#             result = self.remove_substring(result, "```")
+#             new_messages.append(
+#                 {
+#                     "role": response.choices[0].message.role,
+#                     "content": result,
+#                 }
+#             )
+#         return result, new_messages
+
 class Generator:
-    def __init__(self, model_name="gpt-4o", temperature=0.7, api_key_path="./api.key"):
+    # Set a Gemini model as the new default
+    def __init__(self, model_name="gemini-2.5-flash", temperature=0.7, api_key_path="./api.key"):
         self.temperature = temperature
         self.model_name = model_name
         self.api_key_path = api_key_path
-        with open(self.api_key_path, "r") as file:
-            self.client = OpenAI(api_key=file.read().strip())
+        
+        # Load API key from file and set environment variable for the client
+        try:
+            with open(self.api_key_path, "r") as file:
+                api_key = file.read().strip()
+            # **CRITICAL**: Set the environment variable for the Google client
+            os.environ["GEMINI_API_KEY"] = api_key 
+            self.client = genai.Client()
+        except FileNotFoundError:
+            raise ValueError(f"API key file not found at {api_key_path}. Please create it.")
 
     def remove_substring(self, output, substring):
-
         if substring in output:
             return output.replace(substring, "")
         else:
@@ -65,47 +137,56 @@ class Generator:
 
     def generate(self, prompt, messages=None):
         new_messages = None
-        if self.model_name == "gpt-3.5-turbo-instruct":
-            response = self.client.Completion.create(
-                model=self.model_name,
-                prompt=prompt,
-                temperature=self.temperature,
-                max_tokens=1024,
-                top_p=0.5,
-                frequency_penalty=0,
-                presence_penalty=0,
-                n=1,
-                logprobs=11,
+        
+        try:
+            # 1. Prepare contents for Gemini API (unifies simple prompt and chat history)
+            if not messages:
+                contents = prompt
+            else:
+                # Map standard messages structure to Gemini's Content object structure
+                contents = []
+                for msg in messages:
+                    # Gemini roles are 'user' or 'model' (equivalent to 'assistant')
+                    role = "user" if msg["role"] == "user" else "model"
+                    contents.append({"role": role, "parts": [msg["content"]]})
+
+            # 2. Configuration (temperature goes here)
+            config = genai.types.GenerateContentConfig(
+                temperature=self.temperature
             )
 
-            result = response.choices[0]["text"].lstrip("\n").rstrip("\n")
-            result = self.remove_substring(result, "```python")
-            result = self.remove_substring(result, "```")
+            # 3. Make the API call
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=config,
+            )
 
-        else:
-            if not messages:
-                messages = [{"role": "user", "content": prompt}]
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    temperature=self.temperature,
-                )
-            except Exception as e:
-                time.sleep(60)
-                return self.generate(prompt, messages)
+        except APIError as e:
+            # Handle rate-limiting or other temporary errors
+            print(f"Gemini API Error: {e}. Retrying after 60 seconds...")
+            time.sleep(60)
+            return self.generate(prompt, messages) # Recursive call to retry
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            raise
+
+        # 4. Process result
+        result = response.text.lstrip("\n").rstrip("\n")
+        result = self.remove_substring(result, "```python")
+        result = self.remove_substring(result, "```")
+
+        # 5. Update history if chat messages were provided
+        if messages:
             new_messages = messages
-            result = response.choices[0].message.content.lstrip("\n").rstrip("\n")
-            result = self.remove_substring(result, "```python")
-            result = self.remove_substring(result, "```")
             new_messages.append(
                 {
-                    "role": response.choices[0].message.role,
+                    "role": "assistant",
                     "content": result,
                 }
             )
+        
         return result, new_messages
-
 
 def docstring_from_json(json_file):
     with open(json_file, "r") as file:

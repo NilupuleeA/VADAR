@@ -223,7 +223,7 @@ class VQAModule(OracleModule):
         api_key_path="./api.key",
     ):
         super().__init__("vqa", trace_path)
-        self.generator = Generator("gpt-4o", api_key_path=api_key_path)
+        self.generator = Generator("gemini-2.5-flash", api_key_path=api_key_path)
         self.dataset = dataset
 
         if self.dataset in ["clevr", "gqa"]:
