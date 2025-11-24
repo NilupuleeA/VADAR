@@ -1,4 +1,3 @@
-cd VADAR
 mkdir -p models
 cd models
 
