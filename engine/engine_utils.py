@@ -125,7 +125,8 @@ class Generator:
                 api_key = file.read().strip()
             # **CRITICAL**: Set the environment variable for the Google client
             os.environ["GEMINI_API_KEY"] = api_key 
-            self.client = genai.Client()
+            # self.client = genai.Client()
+            self.client = genai.Client(api_key=api_key)
         except FileNotFoundError:
             raise ValueError(f"API key file not found at {api_key_path}. Please create it.")
 
