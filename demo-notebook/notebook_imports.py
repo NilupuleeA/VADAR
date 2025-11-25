@@ -9,7 +9,8 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.padding import Padding
 from rich.style import Style
-from openai import OpenAI
+# from openai import OpenAI
+import google.generativeai as genai
 import re
 import groundingdino.datasets.transforms as T
 from groundingdino.util.inference import load_model, predict
@@ -41,7 +42,8 @@ def initialize_modules():
     print("Initializing OpenAI Client")
     with open("../api.key", "r") as f:
         api_key = f.read().strip()
-    gpt_client = OpenAI(api_key=api_key)
+    # gpt_client = OpenAI(api_key=api_key)
+    genai.configure(api_key=api_key)
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("Initializing GroundingDINO")
@@ -51,7 +53,6 @@ def initialize_modules():
     )
     print("Initializing UniDepth")
     uni_depth = UniDepthV2.from_pretrained("lpiccinelli/unidepth-v2-vits14").to(device)
-
 
 def remove_substring(output, substring):
     if substring in output:
@@ -78,26 +79,46 @@ def correct_indentation(code_str):
     return tabbed_text
 
 
+# def generate(prompt, messages=None):
+#     if messages:
+#         response = gpt_client.chat.completions.create(
+#             model="gpt-4o",
+#             messages=messages,
+#             temperature=0.7,
+#         )
+#     else:
+#         messages = [{"role": "user", "content": prompt}]
+#         response = gpt_client.chat.completions.create(
+#             model="gpt-4o",
+#             messages=messages,
+#             temperature=0.7,
+#         )
+#     result = response.choices[0].message.content.lstrip("\n").rstrip("\n")
+#     result = remove_substring(result, "```python")
+#     result = remove_substring(result, "```")
+
+#     return result
+
 def generate(prompt, messages=None):
     if messages:
-        response = gpt_client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0.7,
-        )
+        # You have text + image
+        content = messages[0]["content"]
+        text_prompt = content[0]["text"]
+        image_data = content[1]["image_url"]["url"]
+        
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content([
+            text_prompt,
+            {"mime_type": "image/png", "data": base64.b64decode(image_data.split(",")[1])}
+        ])
     else:
-        messages = [{"role": "user", "content": prompt}]
-        response = gpt_client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0.7,
-        )
-    result = response.choices[0].message.content.lstrip("\n").rstrip("\n")
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+
+    result = response.text
     result = remove_substring(result, "```python")
     result = remove_substring(result, "```")
-
     return result
-
 
 def load_image(im_pth):
     image = Image.open(im_pth).convert("RGB")
