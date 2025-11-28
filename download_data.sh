@@ -1,5 +1,4 @@
 #!/bin/bash
-
 mkdir -p data
 cd data
 hf download dmarsili/Omni3D-Bench omni3d-bench.zip --repo-type dataset --local-dir .
