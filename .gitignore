@@ -3,7 +3,7 @@
 *.key
 *.csv
 
-# data/
+data/
 UniDepth/
 sam2/
 GroundingDINO/
