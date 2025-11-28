@@ -73,7 +73,7 @@ class Engine:
             self.results_folder_path,
             f"{folder_name}",
         )
-        os.makedirs(results_folder_path)
+        # os.makedirs(results_folder_path)
 
         for question, program_data in tqdm(
             zip(questions, programs), total=len(questions)
@@ -84,8 +84,6 @@ class Engine:
             )
             os.makedirs(question_results_path)
             exec_env_path = os.path.join(question_results_path, "exec_env/")
-
-            
             os.makedirs(exec_env_path)
 
             self.trace_file_path = os.path.join(exec_env_path, "trace.html")
@@ -137,6 +135,7 @@ class Engine:
                 self.execution_json, results_folder_path, "execution"
             )
 
+    @staticmethod
     def retry_executions_with_oracle(
         execution_folder_path, questions, images_folder_path, scenes_json_path
     ):
@@ -163,7 +162,6 @@ class Engine:
             with open(engine.program_executable_path, "w") as file:
                 file.write(program_data)
 
-            # get image and scene data
             image = Image.open(
                 os.path.join(images_folder_path, question["image_filename"])
             )
@@ -181,7 +179,6 @@ class Engine:
             ]
             scene_json = scene_json[0]
 
-            # execute file
             engine.modules_list.set_trace_path(engine.trace_file_path)
             execution_data = {}
 
@@ -266,10 +263,10 @@ class Engine:
             corrected_program_data = self.correct_program_error(
                 program_data, error, question
             )
-        
+
             if os.path.exists(self.trace_file_path):
                 os.remove(self.trace_file_path)
-            
+
             return self.run_program(
                 corrected_program_data,
                 image,
@@ -321,20 +318,31 @@ class Engine:
                 writer.writerow(entry)
 
     def remove_substring(self, output, substring):
-
         if substring in output:
             return output.replace(substring, "")
         else:
             return output
 
     def correct_program_error(self, program_data, error, question):
-        messages = program_data["messages"]
+        messages = program_data.get("messages")
+
+        if not messages:
+            print(
+                f"No messages found for question {question['question_index']}, "
+                f"skipping auto-correction."
+            )
+            return program_data
+
         messages.append(
             {
                 "role": "user",
-                "content": f"\n There was an error in running the code: {error}. Try again and include the program between <program></program>",
+                "content": (
+                    f"\n There was an error in running the code: {error}. "
+                    "Try again and include the program between <program></program>"
+                ),
             }
         )
+
         generator = Generator(
             program_data["model_name"], api_key_path=self.api_key_path
         )
@@ -372,7 +380,6 @@ class Engine:
             gt = row[-2]
             pred = row[-1]
 
-            # Numeric (count)
             if ans_type == "int":
                 num_ct_n += 1
                 try:
@@ -383,7 +390,6 @@ class Engine:
                 if gt == pred:
                     num_ct_correct += 1
             elif ans_type == "str":
-                # Yes/No
                 if gt in ["yes", "no"]:
                     yn_n += 1
                     try:
@@ -391,7 +397,6 @@ class Engine:
                             yn_correct += 1
                     except:
                         continue
-                # multi
                 else:
                     multi_n += 1
                     try:
@@ -400,7 +405,6 @@ class Engine:
                     except:
                         continue
             elif ans_type == "float":
-                # Numeric (other)
                 num_other_n += 1
                 for threshold in mra_thresholds:
                     try:
@@ -411,7 +415,6 @@ class Engine:
                     if abs(gt - pred) / gt < threshold:
                         correct_at_threshold[threshold] += 1
 
-        # Compute AVG Accuracies
         yn_acc = yn_correct / yn_n if yn_n != 0 else None
         multi_acc = multi_correct / multi_n if multi_n != 0 else None
         num_ct_acc = num_ct_correct / num_ct_n if num_ct_n != 0 else None
@@ -481,9 +484,6 @@ class Engine:
             execution_results += (
                 f"Predicted Answer: {execution[execution_type]['answer']}\n"
             )
-            # execution_results += (
-            #     f"Predicted Oracle Answer: {execution['oracle_execution']['answer']}\n"
-            # )
             execution_results += (
                 f"Correct Answer: {execution[execution_type]['question']['answer']}\n"
             )
@@ -497,33 +497,12 @@ class Engine:
                 == execution[execution_type]["question"]["answer"]
             ):
                 num_correct += 1
-            #     if (
-            #         str(execution["oracle_execution"]["answer"])
-            #         == execution["execution"]["question"]["answer"]
-            #     ):
-            #         num_correct_oracle += 1
-            #         both_correct += 1
-            #     else:
-            #         only_execution_correct += 1
-            # elif (
-            #     str(execution["oracle_execution"]["answer"])
-            #     == execution["execution"]["question"]["answer"]
-            # ):
-            #     num_correct_oracle += 1
-            #     only_oracle_correct += 1
 
         execution_results += f"\nOnly Execution Correct: {float(only_execution_correct)/len(execution_data)}\n"
-        # execution_results += (
-        #     # f"Only Oracle Correct: {float(only_oracle_correct)/len(execution_data)}\n"
-        # )
         execution_results += (
             f"Both Correct: {float(both_correct)/len(execution_data)}\n"
         )
-        # execution_results += f"Both Incorrect: {1 - (float(both_correct + only_oracle_correct + only_execution_correct)/len(execution_data))}\n"
         execution_results += f"Accuracy: {float(num_correct)/len(execution_data)}\n"
-        # execution_results += (
-        #     f"Oracle Accuracy: {float(num_correct_oracle)/len(execution_data)}\n\n"
-        # )
 
         with open(execution_results_path, "w+") as file:
             file.write(execution_results)
@@ -532,7 +511,6 @@ class Engine:
         csv_path = os.path.join(results_path, f"{execution_type}.csv")
         self.write_csv(csv_path, json_results)
 
-        # Write summarized results
         self.write_summarized_results(
             csv_path, os.path.join(results_path, "results.txt")
         )
@@ -579,7 +557,6 @@ with open("{self.result_file}", "w+") as result_file:
                 if "import" in line:
                     self.namespace_line = lineno
                     return self._trace_execution
-                # Get function name if we're inside one
                 function_name = frame.f_code.co_name
                 trace_line = f"<p>{lineno}: "
                 if function_name and function_name != '<module>':

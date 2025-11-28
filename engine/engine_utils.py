@@ -138,20 +138,79 @@ class Generator:
 
     def generate(self, prompt, messages=None):
         new_messages = None
-        
+
         try:
-            # 1. Prepare contents for Gemini API (unifies simple prompt and chat history)
-            if not messages:
-                contents = prompt
+            # 1. Build `contents` in the format expected by google-genai
+            if messages is None or len(messages) == 0:
+                # Simple one-shot text call
+                text = "" if prompt is None else str(prompt)
+                contents = [genai.types.Part(text=text)]
             else:
-                # Map standard messages structure to Gemini's Content object structure
                 contents = []
                 for msg in messages:
-                    # Gemini roles are 'user' or 'model' (equivalent to 'assistant')
-                    role = "user" if msg["role"] == "user" else "model"
-                    contents.append({"role": role, "parts": [msg["content"]]})
+                    role = "user" if msg.get("role") == "user" else "model"
+                    parts = []
 
-            # 2. Configuration (temperature goes here)
+                    content = msg.get("content", "")
+
+                    # Case 1: content is a list of pieces (e.g. [{"type": "text", ...}, {"type": "image_url", ...}])
+                    if isinstance(content, list):
+                        for piece in content:
+                            # Plain string
+                            if isinstance(piece, str):
+                                parts.append(genai.types.Part(text=piece))
+
+                            # {"type": "text", "text": "..."}
+                            elif isinstance(piece, dict) and piece.get("type") == "text":
+                                parts.append(
+                                    genai.types.Part(text=str(piece.get("text", "")))
+                                )
+
+                            # {"type": "image_url", "image_url": {"url": "..."}}
+                            elif isinstance(piece, dict) and piece.get("type") == "image_url":
+                                img_spec = piece.get("image_url", {})
+                                url = img_spec.get("url", "")
+
+                                if url.startswith("data:"):
+                                    # data URL like "data:image/png;base64,AAAA..."
+                                    try:
+                                        header, b64data = url.split(",", 1)
+                                        # "data:image/png;base64" -> "image/png"
+                                        mime_type = header.split(";")[0].split(":")[1]
+                                        img_bytes = base64.b64decode(b64data)
+                                        parts.append(
+                                            genai.types.Part.from_bytes(
+                                                data=img_bytes,
+                                                mime_type=mime_type,
+                                            )
+                                        )
+                                    except Exception as e:
+                                        # Fallback: if something goes wrong, just send it as text
+                                        parts.append(genai.types.Part(text=str(piece)))
+                                else:
+                                    # Remote URL – best-effort
+                                    parts.append(
+                                        genai.types.Part.from_uri(
+                                            file_uri=url,
+                                            mime_type="image/png",
+                                        )
+                                    )
+                            else:
+                                # Unknown structure – just stringify
+                                parts.append(genai.types.Part(text=str(piece)))
+                    else:
+                        # Case 2: content is just a string or something simple
+                        parts.append(genai.types.Part(text=str(content)))
+
+                    # Wrap role + parts into a Content object
+                    contents.append(
+                        genai.types.Content(
+                            role=role,
+                            parts=parts,
+                        )
+                    )
+
+            # 2. Configuration (temperature etc.)
             config = genai.types.GenerateContentConfig(
                 temperature=self.temperature
             )
@@ -164,10 +223,9 @@ class Generator:
             )
 
         except APIError as e:
-            # Handle rate-limiting or other temporary errors
             print(f"Gemini API Error: {e}. Retrying after 60 seconds...")
             time.sleep(60)
-            return self.generate(prompt, messages) # Recursive call to retry
+            return self.generate(prompt, messages)
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             raise
@@ -178,7 +236,7 @@ class Generator:
         result = self.remove_substring(result, "```")
 
         # 5. Update history if chat messages were provided
-        if messages:
+        if messages is not None:
             new_messages = messages
             new_messages.append(
                 {
@@ -186,8 +244,9 @@ class Generator:
                     "content": result,
                 }
             )
-        
+
         return result, new_messages
+
 
 def docstring_from_json(json_file):
     with open(json_file, "r") as file:

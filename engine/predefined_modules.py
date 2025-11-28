@@ -615,13 +615,13 @@ class ModulesList:
             self.molmo_processor = AutoProcessor.from_pretrained(
                 "allenai/Molmo-7B-D-0924",
                 trust_remote_code=True,
-                torch_dtype="auto",
+                torch_dtype=torch.float16,
                 device_map="auto",
             )
             self.molmo_model = AutoModelForCausalLM.from_pretrained(
                 "allenai/Molmo-7B-D-0924",
                 trust_remote_code=True,
-                torch_dtype="auto",
+                torch_dtype=torch.float16,
                 device_map="auto",
             )
             print("Molmo Initialized")
