@@ -13,7 +13,6 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from unidepth.models import UniDepthV2
 import groundingdino.datasets.transforms as T
-from transformers import BitsAndBytesConfig
 
 from VADAR.prompts.vqa_prompt import (
     VQA_PROMPT_CLEVR,
@@ -613,24 +612,17 @@ class ModulesList:
                 )
             )
             print("SAM2 Initialized")
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4"
-            )
             self.molmo_processor = AutoProcessor.from_pretrained(
                 "allenai/Molmo-7B-D-0924",
                 trust_remote_code=True,
-                torch_dtype=torch.float16,
+                torch_dtype="auto",
                 device_map="auto",
             )
             self.molmo_model = AutoModelForCausalLM.from_pretrained(
                 "allenai/Molmo-7B-D-0924",
                 trust_remote_code=True,
-                torch_dtype=torch.float16,
+                torch_dtype="auto",
                 device_map="auto",
-                quantization_config=quantization_config,
             )
             print("Molmo Initialized")
         else:
