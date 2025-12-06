@@ -28,7 +28,11 @@ class CLEVROracle:
         self.large_box_scale_factor = 3
         self.depth_scale_factor = 150
 
-    def locate(self, object_description, scene_json):
+    def set_scene(self, scene_json):
+        self.scene_json = scene_json
+
+    # def locate(self, object_description, scene_json):
+    def locate(self, image, object_description, scene_json):
         matching_objects = self._find_objects(scene_json, object_description)
         pts = [
             (obj["pixel_coords"][0], obj["pixel_coords"][1]) for obj in matching_objects
@@ -46,8 +50,8 @@ class CLEVROracle:
         )
         return closest_obj["pixel_coords"][2]
 
-    def same_object(self, x_1, y_1, x_2, y_2, scene_json):
-        objects = scene_json["objects"]
+    def same_object(self, image, x_1, y_1, x_2, y_2):
+        objects = self.scene_json["objects"]
         closest_obj_1 = min(
             objects,
             key=lambda obj: (
