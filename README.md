@@ -7,7 +7,8 @@ This repository contains the official implementation of the CVPR 2025 research p
 
 ## Overview
 VADAR is a visual agentic AI framework for complex spatial and 3D reasoning from images.  
-It dynamically generates APIs and executable programs using an agent-based pipeline that combines vision models and large language models to answer visual questions.
+It dynamically generates APIs and executable programs using an agent-based pipeline that combines vision models and large language models to answer visual questions.  
+More detailed information about the methodology and system design can be found in **VADAR.pdf**.
 
 ## How to Run
 
@@ -33,7 +34,3 @@ sh download_data.sh
 python evaluate.py \
   --annotations-json data/[DATASET_NAME]/annotations.json \
   --image-pth data/[DATASET_NAME]/images/
-
-# Optional dataset flags
-# --dataset clevr
-# --dataset gqa
